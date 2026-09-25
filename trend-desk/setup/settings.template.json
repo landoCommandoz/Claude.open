@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit(./state/**)",
+      "Write(./state/**)",
+      "Write(./reports/**)",
+      "Bash(python3 scripts/engine.py:*)",
+      "Bash(python3 scripts/data.py:*)",
+      "mcp__robinhood-trading__*"
+    ],
+    "deny": [
+      "Edit(./config/**)", "Write(./config/**)",
+      "Edit(./scripts/**)", "Write(./scripts/**)",
+      "Edit(./prompts/**)", "Write(./prompts/**)",
+      "Edit(./reference/**)", "Write(./reference/**)",
+      "Edit(./.claude/**)", "Write(./.claude/**)",
+      "Edit(./CLAUDE.md)", "Write(./CLAUDE.md)",
+      "Edit(./BUILD.md)", "Write(./BUILD.md)",
+      "WebFetch", "WebSearch"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "mcp__robinhood-trading__.*",
+       "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/guard.py", "timeout": 20}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "mcp__robinhood-trading__.*",
+       "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/capture.py", "timeout": 20}]}
+    ]
+  }
+}

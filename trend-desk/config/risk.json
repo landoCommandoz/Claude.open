@@ -1,0 +1,74 @@
+{
+  "version": "1.2",
+  "mode": "DRY",
+  "account": {
+    "starting_capital": 400,
+    "floor_equity": 320,
+    "floor_gap_allowance_frac": 0.05,
+    "stop_slip_pause_frac": 0.05,
+    "daily_loss_limit_frac": 0.03,
+    "weekly_loss_limit_frac": 0.05
+  },
+  "universe": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "DOGE"
+  ],
+  "strategy": {
+    "entry_lookback": 20,
+    "exit_lookback": 10,
+    "trend_sma": 50,
+    "atr_period": 20,
+    "stop_atr_mult": 2.0,
+    "risk_per_trade": 0.01,
+    "max_position_frac": 0.3,
+    "max_positions": 3,
+    "max_open_risk_frac": 0.03,
+    "min_stop_frac": 0.03,
+    "min_notional": 20.0,
+    "cash_buffer_frac": 0.03,
+    "dd_step": 0.1,
+    "dd_cut": 0.2
+  },
+  "execution": {
+    "cost_per_side_assumed": 0.0095,
+    "cost_per_side_stress": 0.0125,
+    "max_spread_frac": 0.025,
+    "entry_limit_slippage_frac": 0.005,
+    "entry_fill_timeout_sec": 120,
+    "chase_limit_n": 0.5,
+    "price_check_tolerance_frac": 0.015,
+    "min_ratchet_n": 0.25,
+    "stop_time_in_force": "gtc",
+    "stop_refresh_days": 80,
+    "stop_retry_limit": 2,
+    "exit_reprice_attempts": 3,
+    "exit_reprice_step_frac": 0.01,
+    "approval_ttl_sec": 300,
+    "tape_max_age_sec": 180,
+    "dust_qty_frac": 0.001
+  },
+  "schedule": {
+    "daily_run_utc": "00:07",
+    "watcher_interval_min": 5,
+    "missed_daily_alert_utc": "02:00",
+    "stale_run_alert_hours": 26,
+    "weekly_review_day": "SUN"
+  },
+  "alerts": {
+    "ntfy_topic": "",
+    "daily_summary": true
+  },
+  "gate": {
+    "full_start": "2020-01-01",
+    "recent_start": "2022-01-01",
+    "min_trades": 30,
+    "min_profit_factor": 1.3,
+    "min_expectancy_r": 0.1,
+    "max_drawdown_pct": -35,
+    "recent_min_profit_factor": 1.2,
+    "stress_min_profit_factor": 1.1,
+    "rolling_max_floor_hits": 1
+  }
+}

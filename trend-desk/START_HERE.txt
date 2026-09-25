@@ -1,0 +1,25 @@
+TREND DESK: START HERE
+
+1. Robinhood, on a desktop browser: open an Agentic account, turn on Robinhood Crypto
+   for it, accept the crypto agreement, deposit $400.
+
+2. On the Windows PC that will run the desk: install Python 3.12 from python.org and check
+   "Add python.exe to PATH". Set sleep to Never when plugged in. Put this folder on that PC.
+
+3. Open a terminal inside this folder and run:
+
+   claude mcp add robinhood-trading --transport http https://agent.robinhood.com/mcp/trading
+   claude
+
+   Inside Claude Code, type /mcp and log in to Robinhood in the browser.
+   Then run: claude mcp list
+   Robinhood must show as connected there. The chat app connection does not count for Claude Code.
+
+4. Paste this into Claude Code:
+
+   Read CLAUDE.md and BUILD.md. Execute BUILD.md step by step. Stop at every GATE, show me the result, and wait for me.
+
+5. Approve each gate only when it says PASS. Any FAIL means stop, not tweak.
+
+6. Last step is yours alone: type GO LIVE, then open config/risk.json and change
+   "mode": "DRY" to "mode": "LIVE".

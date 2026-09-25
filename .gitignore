@@ -1,0 +1,8 @@
+# Trend Desk runtime output: rebuilt on the machine that runs the desk
+trend-desk/data/
+trend-desk/state/
+trend-desk/logs/
+trend-desk/reports/
+trend-desk/STATUS.md
+__pycache__/
+.pytest_cache/

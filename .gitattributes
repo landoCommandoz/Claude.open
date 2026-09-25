@@ -1,0 +1,2 @@
+# setup/WINDOWS.md: keep LF line endings on the Windows PC. Stops git from converting prompts to CRLF.
+* text=auto eol=lf
