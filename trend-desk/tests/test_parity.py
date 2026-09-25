@@ -20,6 +20,7 @@ from strategy import Params
 
 CANDLES = Path(__file__).resolve().parent / "fixtures" / "candles"
 WINDOW_DAYS = 400
+CLOSED_TRADES = 31          # frozen candles + bid-triggered stops (CHANGELOG 1.3)
 
 
 def run_both(tmp_path, cfg_edit=None):
@@ -49,8 +50,10 @@ def diff(live, back):
 
 
 def test_parity_last_400_days_matches_backtest_exactly(tmp_path):
-    live, back, live_open, bt, st, _ = run_both(tmp_path)
+    live, back, live_open, bt, st, sim = run_both(tmp_path)
     assert st["state"] not in ("PAUSED", "HALTED"), st["reason"]
     assert live == back, json.dumps(diff(live, back), indent=1)
+    assert len(back) == CLOSED_TRADES                        # every closed trade in the window
     assert len(live_open) == bt["open_positions"]
-    assert len(back) >= 10                                  # the window actually traded
+    eq_live = sim.cash + sum(q * sim.close(c) for c, q in sim.hold.items())
+    assert abs(eq_live - float(bt["curve"]["equity"].iloc[-1])) < 0.05

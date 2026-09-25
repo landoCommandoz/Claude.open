@@ -2,9 +2,11 @@
 backtest.py | Backtest engine for the Robinhood trend agent
 
 Replays the exact rules in strategy.py over daily history and charges
-Robinhood's spread on every buy and every sell. Uses full OHLC data when
-present (stops trigger on the daily low, gaps fill at the open) and falls
-back to close-only data (stops trigger on the close) when it is not.
+Robinhood's spread on every buy and every sell. Stops trigger on Robinhood's
+bid, modeled as price x (1 - cost): with full OHLC data a stop triggers when
+the bid at the day's low reaches it and fills at the stop price (at the
+open's bid on a gap). Close-only data uses the close for all three. Stops
+rise only through strategy.should_ratchet, the same rule the live desk uses.
 
 Usage (single run, for exploring; the go/no-go decision is gate.py):
   python3 backtest.py --data-dir data --format ohlc --coins BTC ETH SOL DOGE --config config/risk.json
@@ -21,8 +23,8 @@ from dataclasses import dataclass, asdict
 
 import pandas as pd
 
-from strategy import (Params, indicators, initial_stop, ratchet_stop, size_position,
-                      worst_case_loss)
+from strategy import (Params, indicators, initial_stop, ratchet_stop, should_ratchet, size_position,
+                      stop_fill, worst_case_loss)
 
 
 @dataclass
@@ -121,16 +123,13 @@ def simulate(data: dict, p: Params, *, start: str, end: str | None, cost_side: f
                 continue
             row = frame.loc[d]
             pos = positions[coin]
-            raw_exit = None
-            if "low" in frame.columns and pd.notna(row["low"]):
-                if row["low"] <= pos.stop:
-                    gap_open = pd.notna(row["open"]) and row["open"] <= pos.stop
-                    raw_exit = float(row["open"]) if gap_open else pos.stop
-            elif row["close"] <= pos.stop:
-                raw_exit = float(row["close"])
-            if raw_exit is None:
+            if "low" in frame.columns and pd.notna(row["low"]) and pd.notna(row["open"]):
+                exit_fill = stop_fill(float(row["open"]), float(row["low"]), pos.stop, cost_side)
+            else:
+                exit_fill = stop_fill(float(row["close"]), float(row["close"]), pos.stop, cost_side)
+            if exit_fill is None:
                 continue
-            exit_fill = raw_exit * (1.0 - cost_side)
+            raw_exit = exit_fill / (1.0 - cost_side)
             cash += pos.qty * exit_fill
             pnl = pos.qty * (exit_fill - pos.entry_fill)
             risk0 = pos.initial_risk()
@@ -158,7 +157,9 @@ def simulate(data: dict, p: Params, *, start: str, end: str | None, cost_side: f
         # 4. Ratchet surviving stops (never down).
         for coin, pos in positions.items():
             if d in ind[coin].index:
-                pos.stop = ratchet_stop(pos.stop, ind[coin].at[d, "exit_level"])
+                new = ratchet_stop(pos.stop, ind[coin].at[d, "exit_level"])
+                if should_ratchet(pos.stop, new, float(ind[coin].at[d, "n"]), p.min_ratchet_n):
+                    pos.stop = new
 
         # 5. New entries at the close.
         blocked = (halted_on is not None

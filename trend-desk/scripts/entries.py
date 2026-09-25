@@ -12,7 +12,8 @@ from actions import add_actions, cancel_action, exit_action, order_action, price
 from deskconfig import increments, min_order_ok
 from planner import begin, coverage, orphans, reconcile, risk_state
 from state import STICKY, parse_ts
-from strategy import initial_stop, ratchet_stop, round_down, size_position, worst_case_loss
+from strategy import (initial_stop, ratchet_stop, round_down, should_ratchet, size_position,
+                      worst_case_loss)
 
 
 def ratchets(ctx, snap, actions: list, touched: set, session, planned: dict) -> None:
@@ -25,7 +26,7 @@ def ratchets(ctx, snap, actions: list, touched: set, session, planned: dict) -> 
             continue
         n = float(row["n"])
         new = price_round(ctx, coin, ratchet_stop(pos["stop"], row["exit_level"]))
-        if not (new > pos["stop"] and new - pos["stop"] >= ctx.ex["min_ratchet_n"] * n):
+        if not should_ratchet(pos["stop"], new, n, ctx.p.min_ratchet_n):
             continue
         touched.add(coin)
         planned[coin] = new

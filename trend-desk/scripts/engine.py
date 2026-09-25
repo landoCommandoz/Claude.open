@@ -57,7 +57,7 @@ def read_calls(ctx) -> list[tuple[str, dict]]:
     acct = ctx.st["account"]
     symbols = sorted(set(ctx.cfg["universe"]) | set(ctx.st["positions"]))
     since = iso(ctx.now - timedelta(days=7))
-    values = {"account": acct, "since": since, "symbols": [ctx.tools.get("symbol_format", "{coin}-USD")
+    values = {"account": acct, "account_number": ctx.st.get("account_number"), "since": since, "symbols": [ctx.tools.get("symbol_format", "{coin}-USD")
                                                           .format(coin=c) for c in symbols]}
     calls = []
     for role in ("accounts", "account", "positions", "orders", "quotes"):
@@ -88,6 +88,7 @@ def preflight(root: Path, now, job: str, skip_selftests: bool = False, **kw) -> 
             print(f"CALL 1: {tool_for(ctx.tools, 'accounts')} {{}}")
             return "NOT_READY account not recorded: call get_accounts, then run preflight again"
         ctx.st["account"] = agentic[0].rhs_account_number
+        ctx.st["account_number"] = agentic[0].account_number
         ctx.event("account_recorded")
         ctx.save()
     if ctx.st["state"] in STICKY:

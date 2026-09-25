@@ -24,6 +24,7 @@ class Params:
     trend_sma: int = 50            # only buy coins closing above their 50-day average
     atr_period: int = 20           # N = 20-day Wilder average true range (Turtle "N")
     stop_atr_mult: float = 2.0     # initial stop = fill - 2N
+    min_ratchet_n: float = 0.25    # raise a stop only when the new level is at least 0.25N higher
     risk_per_trade: float = 0.01   # 1% of sizing equity per trade (picked from drawdown tests)
     max_position_frac: float = 0.30
     max_positions: int = 3
@@ -122,6 +123,39 @@ def ratchet_stop(current: float, exit_level: float) -> float:
     if not is_real(exit_level):
         return float(current)
     return max(float(current), float(exit_level))
+
+
+def should_ratchet(current_stop: float, new_level: float, n: float, min_ratchet_n: float) -> bool:
+    """Raise a stop only when the new level is at least min_ratchet_n x N above it.
+
+    Small raises are skipped: every raise is a cancel and a replace at Robinhood, and the
+    live desk and the backtest must skip the same ones.
+    """
+    if not all(is_real(x) for x in (current_stop, new_level, n, min_ratchet_n)):
+        return False
+    if n <= 0 or min_ratchet_n < 0:
+        return False
+    return new_level > current_stop and new_level - current_stop >= min_ratchet_n * n
+
+
+def model_bid(price: float, cost_side: float) -> float:
+    """Robinhood's bid, modeled as the market price less one side of the spread."""
+    return float(price) * (1.0 - float(cost_side))
+
+
+def stop_fill(open_: float, low: float, stop: float, cost_side: float) -> float | None:
+    """Where a resting sell stop fills during one daily bar, or None if it does not trigger.
+
+    The live desk's stops trigger on Robinhood's bid, so the bar triggers the stop when the
+    bid at its low reaches the stop. It fills at the stop price, or at the bid at the open
+    when the bar opens with the bid already at or below the stop (a gap).
+    """
+    if not all(is_real(x) for x in (open_, low, stop, cost_side)) or stop <= 0:
+        return None
+    if model_bid(low, cost_side) > stop:
+        return None
+    open_bid = model_bid(open_, cost_side)
+    return open_bid if open_bid <= stop else float(stop)
 
 
 def drawdown_multiplier(equity: float, peak: float, p: Params) -> float:

@@ -196,7 +196,7 @@ def read_jsonl(path: Path) -> list[dict]:
 def default_state(cfg: dict) -> dict:
     cap = float(cfg["account"]["starting_capital"])
     return {"schema": SCHEMA, "state": "SCANNING", "reason": "", "peak_equity": cap,
-            "last_equity": cap, "account": None,
+            "last_equity": cap, "account": None, "account_number": None,
             "day": {"date": None, "start_equity": cap, "realized": 0.0},
             "week": {"iso": None, "start_equity": cap, "realized": 0.0},
             "starts": {}, "positions": {}, "exited": {}, "vanished": {},

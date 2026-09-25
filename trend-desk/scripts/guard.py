@@ -16,6 +16,7 @@ import json
 import sys
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,8 +26,8 @@ CANCEL_KINDS = ("CANCEL", "RATCHET_CANCEL", "TEST_CANCEL")
 BUY_KINDS = ("BUY", "TEST")
 GOOD_STAMPS = ("LIVE", "TEST")
 STOP_TYPES = ("stop_market", "stop_limit")
-QTY_TOL = 0.001          # 0.1 percent
-PRICE_TOL = 0.0005       # 0.05 percent
+QTY_TOL = Decimal("0.001")      # 0.1 percent
+PRICE_TOL = Decimal("0.0005")    # 0.05 percent
 
 
 def deny_json(reason: str) -> str:
@@ -36,12 +37,19 @@ def deny_json(reason: str) -> str:
                       separators=(",", ":"))
 
 
-def _close(value, target, tol) -> bool:
+def _dec(x) -> Decimal | None:
+    if x is None or isinstance(x, bool):
+        return None
     try:
-        v, t = float(value), float(target)
-    except (TypeError, ValueError):
-        return False
-    return t > 0 and abs(v - t) <= tol * t
+        d = Decimal(str(x))
+    except (InvalidOperation, ValueError):
+        return None
+    return d if d.is_finite() else None
+
+
+def _close(value, target, tol) -> bool:
+    v, t = _dec(value), _dec(target)
+    return v is not None and t is not None and t > 0 and abs(v - t) <= tol * t
 
 
 def _price_ok(approved, sent) -> bool:
@@ -78,6 +86,8 @@ def match(a: dict, klass: str, args: dict, takes_ref: bool, now: datetime,
         return True, "ok", True
     if stop_file and kind in BUY_KINDS:
         return False, "STOP file blocks buys", True
+    if "qty" in args and "notional" in args:
+        return False, "both quantity and dollar amount", True
     if "qty" in args:
         if not _close(args["qty"], a.get("qty"), QTY_TOL):
             return False, "quantity mismatch", True

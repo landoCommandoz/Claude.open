@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import timedelta
+from decimal import ROUND_DOWN, Decimal
 
 from deskconfig import args_map, args_raw, increments, tool_for, tools_for
 from state import approvals_locked, atomic_write_json, iso
@@ -24,6 +25,23 @@ KEEP_APPROVALS_DAYS = 14
 
 def price_round(ctx, coin: str, price: float) -> float:
     return round_down(price, increments(ctx.tools, coin)[1])
+
+
+def dec_str(x: float, increment: float) -> str:
+    """Robinhood takes numbers as strings: cut to the increment, never rounded up, no exponent."""
+    step = Decimal(repr(float(increment)))
+    return format(Decimal(repr(float(x))).quantize(step, rounding=ROUND_DOWN), "f")
+
+
+def wire(ctx, coin: str, order: dict) -> dict:
+    qty_inc, price_inc = increments(ctx.tools, coin)
+    out = dict(order)
+    if out.get("qty") is not None:
+        out["qty"] = dec_str(out["qty"], qty_inc)
+    for key in ("limit_price", "stop_price"):
+        if out.get(key) is not None:
+            out[key] = dec_str(out[key], price_inc)
+    return out
 
 
 def _status(ctx) -> tuple[str, dict]:
@@ -40,7 +58,7 @@ def order_action(ctx, kind: str, coin: str, side: str, order_type: str, qty: flo
              "ref_id": ref_id or str(uuid.uuid4())}
     status_tool, status_args = _status(ctx)
     return {"id": None, "kind": kind, "coin": coin, "tool": tool,
-            "args": args_raw(ctx.tools, tool, {"account": ctx.st["account"], **order}),
+            "args": args_raw(ctx.tools, tool, {"account": ctx.st["account"], **wire(ctx, coin, order)}),
             "status_tool": status_tool, "status_args": status_args, "why": why, "order": order, **extra}
 
 
@@ -93,7 +111,8 @@ def to_preview(ctx, action: dict) -> dict | None:
         return None
     tool = tools_for(ctx.tools, "preview")[0]
     return {**action, "kind": "PREVIEW", "of": action["kind"], "tool": tool,
-            "args": args_raw(ctx.tools, tool, {"account": ctx.st["account"], **action["order"]})}
+            "args": args_raw(ctx.tools, tool, {"account": ctx.st["account"],
+                                               **wire(ctx, action["coin"], action["order"])})}
 
 
 def next_id(plan: dict) -> str:

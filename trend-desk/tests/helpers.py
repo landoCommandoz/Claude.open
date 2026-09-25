@@ -15,6 +15,7 @@ from state import Paths, atomic_write_json, iso, log_event
 REPO = Path(__file__).resolve().parent.parent
 TOOLS = json.loads((REPO / "tests" / "fixtures" / "tools.test.json").read_text())
 ACCT = "5QA00001"
+ACCT_MAIN = "5QA00001-M"
 SERVER = "mcp__robinhood-trading__"
 PLACE, CANCEL, ORDERS = SERVER + "place_crypto_order", SERVER + "cancel_crypto_order", SERVER + "get_crypto_orders"
 NOW = datetime(2026, 10, 2, 0, 7, tzinfo=timezone.utc)
@@ -54,7 +55,7 @@ class FakeBroker:
         self.acct = Account(equity, cash, cash, iso(now))
         self.held, self.orders_ = dict(held or {}), list(orders or [])
         self.quotes_ = dict(quotes or {})
-        self.accounts_ = accounts if accounts is not None else [AgenticAccount(ACCT, True)]
+        self.accounts_ = accounts if accounts is not None else [AgenticAccount(ACCT, True, ACCT_MAIN)]
         self.stale, self.now = stale, now
         self.placed = dict(placements or {})        # ref_id -> Order
         self.statuses = dict(statuses or {})        # order_id -> Order

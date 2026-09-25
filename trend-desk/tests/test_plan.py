@@ -64,7 +64,7 @@ def test_clean_signal_gives_one_buy_with_exact_quantity_and_limit(root):
     stop = initial_stop(limit, n, ctx.p)
     s = size_position(equity=400, peak=400, cash=400, fill=limit, stop=stop, open_risk=0.0,
                       open_positions=0, p=ctx.p, floor=320, gap_frac=0.05, open_worst_case=0.0)
-    assert a["args"]["quantity"] == round_down(s.qty, 1e-8) and a["args"]["limit_price"] == limit
+    assert float(a["args"]["quantity"]) == round_down(s.qty, 1e-8) and float(a["args"]["limit_price"]) == limit
     assert a["args"]["rhs_account_number"] == "5QA00001" and a["args"]["symbol"] == "BTC-USD"
     approvals = read_json(Paths(root).approvals)
     assert len(approvals) == 1 and approvals[0]["mode"] == "LIVE" and approvals[0]["ref_id"] == a["args"]["ref_id"]
@@ -94,7 +94,7 @@ def test_near_the_floor_the_worst_case_floor_sizes_down_or_skips(root, tmp_path)
                   open_positions=1, p=ctx.p, gap_frac=0.05, open_worst_case=worst)
     floored, free = size_position(floor=320, **common), size_position(floor=0.0, **common)
     assert floored.ok and floored.notional < free.notional       # the floor is what binds here
-    assert kinds(plan) == ["BUY"] and plan["actions"][0]["args"]["quantity"] == round_down(floored.qty, 1e-8)
+    assert kinds(plan) == ["BUY"] and float(plan["actions"][0]["args"]["quantity"]) == round_down(floored.qty, 1e-8)
 
     root2 = make_root(tmp_path / "b")
     log_guard_reads(root2)
@@ -110,7 +110,7 @@ def test_position_missing_its_stop_gives_protect_first(root):
     _, plan = plan_for(root, b, frames(BTC=breakout(110.0)))
     assert kinds(plan) == ["PROTECT", "BUY"]
     p = plan["actions"][0]
-    assert p["args"]["stop_price"] == 92.0 and p["args"]["quantity"] == 0.5
+    assert float(p["args"]["stop_price"]) == 92.0 and float(p["args"]["quantity"]) == 0.5
     assert p["args"]["time_in_force"] == "gtc" and p["args"]["type"] == "stop_loss"
 
 
@@ -229,11 +229,11 @@ def test_two_signals_never_exceed_cash_open_risk_or_max_positions(root):
     ctx, plan = plan_for(root, b, fr)
     buys = [a for a in plan["actions"] if a["kind"] == "BUY"]
     assert 2 <= len(buys) <= ctx.p.max_positions
-    notional = sum(a["args"]["quantity"] * a["args"]["limit_price"] for a in buys)
-    risk = sum(a["args"]["quantity"] * (a["args"]["limit_price"] - a["planned_stop"]) for a in buys)
+    notional = sum(float(a["args"]["quantity"]) * float(a["args"]["limit_price"]) for a in buys)
+    risk = sum(float(a["args"]["quantity"]) * (float(a["args"]["limit_price"]) - a["planned_stop"]) for a in buys)
     assert notional <= 150.0 - ctx.p.cash_buffer_frac * 400.0 + 1e-9
     assert risk <= ctx.p.max_open_risk_frac * 400.0 + 1e-9
-    assert all(a["args"]["quantity"] * a["args"]["limit_price"] <= 0.3 * 400 + 1e-9 for a in buys)
+    assert all(float(a["args"]["quantity"]) * float(a["args"]["limit_price"]) <= 0.3 * 400 + 1e-9 for a in buys)
 
 
 def test_dry_mode_turns_orders_into_previews_and_writes_no_approvals(tmp_path):

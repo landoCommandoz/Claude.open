@@ -7,8 +7,8 @@ import math
 
 import pandas as pd
 
-from strategy import (Params, drawdown_multiplier, indicators, initial_stop, ratchet_stop,
-                      round_down, size_position, wilder, worst_case_loss)
+from strategy import (Params, drawdown_multiplier, indicators, initial_stop, model_bid, ratchet_stop,
+                      round_down, should_ratchet, size_position, stop_fill, wilder, worst_case_loss)
 from backtest import simulate, metrics
 
 P = Params()
@@ -58,6 +58,28 @@ def test_ratchet_never_lowers():
     assert ratchet_stop(94.0, 90.0) == 94.0
     assert ratchet_stop(94.0, 97.0) == 97.0
     assert ratchet_stop(94.0, float("nan")) == 94.0
+
+
+def test_should_ratchet_needs_a_quarter_n_raise():
+    assert P.min_ratchet_n == 0.25
+    assert should_ratchet(90.0, 91.0, 4.0, 0.25) is True          # exactly 0.25N higher
+    assert should_ratchet(90.0, 90.99, 4.0, 0.25) is False        # just under 0.25N
+    assert should_ratchet(90.0, 89.0, 4.0, 0.25) is False         # never down
+    assert should_ratchet(90.0, 90.0, 4.0, 0.0) is False          # no raise, even with no minimum
+    assert should_ratchet(90.0, 90.01, 4.0, 0.0) is True
+    assert should_ratchet(90.0, float("nan"), 4.0, 0.25) is False
+    assert should_ratchet(90.0, 95.0, 0.0, 0.25) is False         # no valid N, no raise
+
+
+def test_stop_triggers_on_the_modeled_bid_and_fills_at_the_stop():
+    assert abs(model_bid(100.0, 0.01) - 99.0) < 1e-12
+    # low 100.5: bid at the low 99.495 is above a 99.4 stop, so no trigger
+    assert stop_fill(102.0, 100.5, 99.4, 0.01) is None
+    # low 100.3: bid at the low 99.297 reaches the 99.4 stop, fill at the stop
+    assert stop_fill(102.0, 100.3, 99.4, 0.01) == 99.4
+    # open 100.0: bid at the open 99.0 is already below the 99.4 stop, fill at the open's bid
+    assert abs(stop_fill(100.0, 98.0, 99.4, 0.01) - 99.0) < 1e-12
+    assert stop_fill(100.0, 98.0, float("nan"), 0.01) is None
 
 
 def test_drawdown_multiplier_steps():

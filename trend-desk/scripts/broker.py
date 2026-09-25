@@ -14,8 +14,8 @@ Each parser takes one tool_response and returns the normalized value for its rol
 from __future__ import annotations
 
 import json
-import math
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from datetime import datetime
 from pathlib import Path
 
@@ -84,6 +84,7 @@ class Quote:
 class AgenticAccount:
     rhs_account_number: str
     agentic_allowed: bool
+    account_number: str
 
 
 def _num(fields: dict, key: str, *, nullable=False, positive=False) -> float | None:
@@ -92,13 +93,15 @@ def _num(fields: dict, key: str, *, nullable=False, positive=False) -> float | N
     v = fields[key]
     if v is None and nullable:
         return None
+    if isinstance(v, bool) or not isinstance(v, (str, int, float)):
+        raise TapeError(f"unreadable number in {key}: {v!r}")
     try:
-        x = float(v)
-    except (TypeError, ValueError):
+        d = Decimal(str(v).strip())
+    except (InvalidOperation, ValueError):
         raise TapeError(f"unreadable number in {key}: {v!r}") from None
-    if not math.isfinite(x) or x < 0 or (positive and x <= 0):
+    if not d.is_finite() or d < 0 or (positive and d <= 0):
         raise TapeError(f"bad number in {key}: {v!r}")
-    return x
+    return float(d)
 
 
 def _text(fields: dict, key: str, *, nullable=False, choices=None) -> str | None:
@@ -146,7 +149,7 @@ def make_quote(f: dict) -> Quote:
 def make_agentic_account(f: dict) -> AgenticAccount:
     if not isinstance(f.get("agentic_allowed"), bool):
         raise TapeError("missing field agentic_allowed")
-    return AgenticAccount(_text(f, "rhs_account_number"), f["agentic_allowed"])
+    return AgenticAccount(_text(f, "rhs_account_number"), f["agentic_allowed"], _text(f, "account_number"))
 
 
 def _unmapped(role: str):

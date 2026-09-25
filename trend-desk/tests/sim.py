@@ -13,10 +13,15 @@ import pandas as pd
 import guard
 from broker import Account, AgenticAccount, Order, Quote
 from deskconfig import READ_ROLES, args_canonical, tools_for
-from helpers import ACCT, TOOLS, log_guard_reads
+from helpers import ACCT, ACCT_MAIN, TOOLS, log_guard_reads
 from state import iso
+from strategy import stop_fill
 
 HISTORY_DAYS = 8
+
+
+def _f(x):
+    return None if x is None else float(x)          # the wire carries decimal strings
 
 
 class SimBroker:
@@ -36,14 +41,14 @@ class SimBroker:
         self.day, self.now = day, now
 
     def intraday_stops(self, day):
-        """Resting stops trigger on the day's low, gaps fill at the open, like backtest.py."""
+        """Resting stops trigger on the modeled bid, with the same strategy.stop_fill as backtest.py."""
         for o in self.orders.values():
             if o["status"] != "open" or o["type"] != "stop_market":
                 continue
             row = self.frames[o["coin"]].loc[pd.Timestamp(day)]
-            if row["low"] <= o["stop_price"]:
-                raw = float(row["open"]) if row["open"] <= o["stop_price"] else o["stop_price"]
-                self._fill(o, raw * (1 - self.cost), datetime.combine(day, time(12), timezone.utc))
+            fill = stop_fill(float(row["open"]), float(row["low"]), o["stop_price"], self.cost)
+            if fill is not None:
+                self._fill(o, fill, datetime.combine(day, time(12), timezone.utc))
 
     def _fill(self, o, price, when):
         o.update(status="filled", filled_qty=o["qty"], avg_fill_price=price, updated_at=iso(when))
@@ -69,8 +74,8 @@ class SimBroker:
         oid = f"o{len(self.orders) + 1}"
         self.refs[a["ref_id"]] = oid
         o = {"id": oid, "coin": a["coin"], "side": a["side"], "type": a["order_type"], "qty": float(a["qty"]),
-             "filled_qty": 0.0, "avg_fill_price": None, "limit_price": a.get("limit_price"),
-             "stop_price": a.get("stop_price"), "status": "open", "created_at": iso(self.now),
+             "filled_qty": 0.0, "avg_fill_price": None, "limit_price": _f(a.get("limit_price")),
+             "stop_price": _f(a.get("stop_price")), "status": "open", "created_at": iso(self.now),
              "updated_at": None, "reject_reason": None}
         self.orders[oid] = o
         if o["side"] == "sell":
@@ -90,7 +95,7 @@ class SimBroker:
         return Order(**o)
 
     def accounts(self, max_age):
-        return [AgenticAccount(ACCT, True)]
+        return [AgenticAccount(ACCT, True, ACCT_MAIN)]
 
     def account(self, max_age):
         eq = self.cash + sum(q * self.close(c) for c, q in self.hold.items())

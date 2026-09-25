@@ -134,7 +134,7 @@ def _stop(ctx, plan, action, o, prog) -> str:
         if pos is not None:
             pos.update(stop=want["stop_price"], stop_order_id=o.id, stop_placed_at=iso(ctx.now))
         ctx.event("stop_live", coin=coin, seconds=_age(ctx, action))
-        return "NEXT"
+        return "STOP" if action.get("stop_run") else "NEXT"
     if o.is_live:
         ctx.incident(f"{action['kind']} {coin}: live stop does not match the plan")
         return _new(ctx, plan, cancel_action(ctx, coin, o.id, "stop does not match the plan",
@@ -151,6 +151,9 @@ def _stop(ctx, plan, action, o, prog) -> str:
     if prog["retries"] < ctx.ex["stop_retry_limit"]:
         reissue(ctx, action)
         return "RETRY"
+    if action.get("stop_run"):                 # the sell already failed: do not loop, a human decides
+        ctx.pause(f"{coin} has no stop: the exit and the stop both failed")
+        return "STOP"
     ctx.pause(f"stop would not place for {coin}")
     return _new(ctx, plan, _emergency_exit(ctx, coin, "stop would not place"))
 
@@ -181,15 +184,22 @@ def _exit(ctx, plan, action, o, prog) -> str:
         return "WAIT 20"
     attempt = action.get("attempt", 0)
     final = ctx.ex["exit_reprice_attempts"] + 1
-    if attempt >= final:
-        ctx.incident(f"EXIT {coin} did not fill after the last attempt", force_alert=True)
-        return "STOP"
     if o.filled_qty > 0 and coin in ctx.st["positions"]:
         ctx.close_trade(coin, o.filled_qty, o.avg_fill_price, _ts(ctx, o),
                         action["exit_reason"], action.get("stop_ref"))
     if coin not in ctx.st["positions"]:
         return "NEXT"
     qty = ctx.st["positions"][coin]["qty"]
+    if attempt >= final:                       # no position ever sits without a stop
+        ctx.incident(f"EXIT {coin} did not fill after the last attempt: putting the stop back",
+                     force_alert=True)
+        pos = ctx.st["positions"][coin]
+        pos["stop_order_id"] = None
+        back = stop_action(ctx, "PROTECT", coin, qty, pos["stop"],
+                           f"exit failed: put the stop back at {pos['stop']:g}", stop_run=True)
+        if o.is_live:
+            return _new(ctx, plan, cancel_action(ctx, coin, o.id, "last exit attempt did not fill", then=back))
+        return _new(ctx, plan, back)
     if attempt + 1 < final:
         price = action["order"]["limit_price"] * (1 - ctx.ex["exit_reprice_step_frac"])
     else:
@@ -246,6 +256,7 @@ def _rebuild(ctx, a: dict) -> dict:
     """Rebuild a queued follow-up so its quantity matches what is held now, with a fresh ref_id."""
     o = a["order"]
     if a["kind"] == "PROTECT":
-        return stop_action(ctx, "PROTECT", a["coin"], o["qty"], o["stop_price"], a["why"])
+        return stop_action(ctx, "PROTECT", a["coin"], o["qty"], o["stop_price"], a["why"],
+                           **({"stop_run": True} if a.get("stop_run") else {}))
     return exit_action(ctx, a["coin"], o["qty"], o["limit_price"], a["exit_reason"], a["why"],
                        stop_ref=a.get("stop_ref"), attempt=a.get("attempt", 0))

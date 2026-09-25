@@ -11,7 +11,7 @@
       "class": "read",
       "role": "account_value",
       "args_map": {
-        "account": "account_number"
+        "account_number": "account_number"
       }
     },
     "mcp__SERVER__get_crypto_positions": {
@@ -56,7 +56,8 @@
         "qty": "quantity",
         "limit_price": "limit_price",
         "stop_price": "stop_price",
-        "time_in_force": "time_in_force"
+        "time_in_force": "time_in_force",
+        "notional": "dollar_amount"
       }
     },
     "mcp__SERVER__place_crypto_order": {
@@ -71,7 +72,8 @@
         "limit_price": "limit_price",
         "stop_price": "stop_price",
         "time_in_force": "time_in_force",
-        "ref_id": "ref_id"
+        "ref_id": "ref_id",
+        "notional": "dollar_amount"
       }
     },
     "mcp__SERVER__cancel_crypto_order": {

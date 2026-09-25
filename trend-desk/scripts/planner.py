@@ -55,14 +55,15 @@ def account_check(ctx, snap: Snapshot) -> bool:
     if len(agentic) != 1:
         ctx.pause(f"expected exactly one agentic account, saw {len(agentic)}")
         return False
-    number = agentic[0].rhs_account_number
+    number, main = agentic[0].rhs_account_number, agentic[0].account_number
     if ctx.st["account"] is None:
-        ctx.st["account"] = number
+        ctx.st["account"], ctx.st["account_number"] = number, main
         ctx.event("account_recorded")
         ctx.say("Recorded the agentic account.")
-    elif ctx.st["account"] != number:
+    elif ctx.st["account"] != number or ctx.st.get("account_number") not in (None, main):
         ctx.pause("agentic account changed")
         return False
+    ctx.st["account_number"] = main
     return True
 
 

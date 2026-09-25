@@ -53,14 +53,16 @@ SPEC = {
                 "stop_slip_pause_frac": _frac, "daily_loss_limit_frac": _frac,
                 "weekly_loss_limit_frac": _frac},
     "strategy": {"entry_lookback": _pos_int, "exit_lookback": _pos_int, "trend_sma": _pos_int,
-                 "atr_period": _pos_int, "stop_atr_mult": _pos, "risk_per_trade": _frac,
+                 "atr_period": _pos_int, "stop_atr_mult": _pos,
+                 "min_ratchet_n": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 2,
+                 "risk_per_trade": _frac,
                  "max_position_frac": _frac, "max_positions": _pos_int, "max_open_risk_frac": _frac,
                  "min_stop_frac": _frac, "min_notional": _pos, "cash_buffer_frac": _frac,
                  "dd_step": _frac, "dd_cut": _frac},
     "execution": {"cost_per_side_assumed": _frac, "cost_per_side_stress": _frac,
                   "max_spread_frac": _frac, "entry_limit_slippage_frac": _frac,
                   "entry_fill_timeout_sec": _pos_int, "chase_limit_n": _pos,
-                  "price_check_tolerance_frac": _frac, "min_ratchet_n": lambda v: _pos(v) or v == 0,
+                  "price_check_tolerance_frac": _frac,
                   "stop_time_in_force": lambda v: v == "gtc", "stop_refresh_days": _pos_int,
                   "stop_retry_limit": _pos_int, "exit_reprice_attempts": _pos_int,
                   "exit_reprice_step_frac": _frac, "approval_ttl_sec": _pos_int,
@@ -202,7 +204,12 @@ def symbol_for(tools: dict, coin: str) -> str:
 
 
 def coin_from_symbol(raw) -> str:
-    return str(raw).upper().split("-")[0].split("/")[0]
+    """'BTC', 'BTC-USD', 'BTC/USD', and the quote tool's 'BTCUSD' all mean BTC."""
+    s = str(raw).upper().strip().replace("/", "-")
+    base = s.split("-")[0]
+    if "-" not in s and len(base) > 3 and base.endswith("USD"):
+        base = base[:-3]
+    return base
 
 
 def args_map(tools: dict, tool_name: str) -> dict:

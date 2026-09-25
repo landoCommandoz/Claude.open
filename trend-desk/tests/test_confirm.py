@@ -49,15 +49,15 @@ def test_filled_buy_gives_protect_for_the_exact_filled_quantity(root):
     b = FakeBroker(quotes=quotes(BTC=110.0))
     fr = frames(BTC=breakout(110.0))
     ctx, buy = buy_plan(root, b, fr)
-    qty = buy["args"]["quantity"]
+    qty = float(buy["args"]["quantity"])
     b.placed[buy["args"]["ref_id"]] = order("b1", side="buy", type_="limit", qty=qty, filled=qty,
-                                            avg=110.3, limit=buy["args"]["limit_price"], status="filled",
+                                            avg=110.3, limit=float(buy["args"]["limit_price"]), status="filled",
                                             updated="2026-10-02T00:07:30Z")
     ctx2, line = step(root, b, fr, buy["id"], NOW + timedelta(seconds=30))
     p = new_action(line)
     n = float(ctx.row("BTC", SESSION)["n"])
-    assert p["kind"] == "PROTECT" and p["args"]["quantity"] == qty
-    assert p["args"]["stop_price"] == round_down(initial_stop(110.3, n, ctx.p), 0.01)
+    assert p["kind"] == "PROTECT" and float(p["args"]["quantity"]) == qty
+    assert float(p["args"]["stop_price"]) == round_down(initial_stop(110.3, n, ctx.p), 0.01)
     pos = ctx2.st["positions"]["BTC"]
     assert pos["qty"] == qty and pos["entry_fill"] == 110.3
 
@@ -83,7 +83,7 @@ def test_partial_fill_past_the_timeout_gives_cancel_then_protect(root):
     b.statuses["b1"] = order("b1", side="buy", type_="limit", qty=0.2, filled=0.06, avg=110.2, status="canceled")
     ctx, line = step(root, b, fr, cancel["id"], later + timedelta(seconds=10))
     protect = new_action(line)
-    assert protect["kind"] == "PROTECT" and protect["args"]["quantity"] == 0.06
+    assert protect["kind"] == "PROTECT" and float(protect["args"]["quantity"]) == 0.06
     assert ctx.st["positions"]["BTC"]["qty"] == 0.06
 
 
@@ -111,7 +111,7 @@ def test_stop_rejected_twice_gives_exit_and_paused(root):
     assert len(same_ref) == 2 and not same_ref[-1]["used"]          # fresh approval, SAME ref_id
     ctx, line = step(root, b, frames(), protect["id"], NOW + timedelta(seconds=15))
     exit_ = new_action(line)
-    assert exit_["kind"] == "EXIT" and exit_["args"]["side"] == "sell" and exit_["args"]["quantity"] == 0.5
+    assert exit_["kind"] == "EXIT" and exit_["args"]["side"] == "sell" and float(exit_["args"]["quantity"]) == 0.5
     assert ctx.st["state"] == "PAUSED" and "stop would not place" in ctx.st["reason"]
 
 
@@ -139,12 +139,12 @@ def test_failed_ratchet_puts_the_old_stop_back_then_exits_if_that_fails(root):
     t = NOW + timedelta(seconds=5)
     b.statuses["s1"] = order("s1", qty=0.1, stop=90.0, status="canceled")
     place = new_action(step(root, b, fr, rc["id"], t)[1])
-    assert place["kind"] == "RATCHET_PLACE" and place["args"]["stop_price"] == rc["new_stop"]
+    assert place["kind"] == "RATCHET_PLACE" and float(place["args"]["stop_price"]) == rc["new_stop"]
     b.placed[place["args"]["ref_id"]] = order("r1", qty=0.1, stop=rc["new_stop"], status="rejected")
     assert step(root, b, fr, place["id"], t)[1] == "RETRY"
     ctx, line = step(root, b, fr, place["id"], t)
     back = new_action(line)
-    assert back["kind"] == "PROTECT" and back["args"]["stop_price"] == 90.0     # the old stop goes back
+    assert back["kind"] == "PROTECT" and float(back["args"]["stop_price"]) == 90.0     # the old stop goes back
     assert ctx.st["positions"]["BTC"]["stop"] == 90.0
     b.placed[back["args"]["ref_id"]] = order("r2", qty=0.1, stop=90.0, status="rejected")
     assert step(root, b, fr, back["id"], t)[1] == "RETRY"
@@ -158,7 +158,7 @@ def test_exit_filled_writes_the_journal_and_checks_slip(root):
     step(root, b, frames(), protect["id"], NOW)
     exit_ = new_action(step(root, b, frames(), protect["id"], NOW)[1])
     b.placed[exit_["args"]["ref_id"]] = order("e1", coin="SOL", type_="limit", qty=0.5, filled=0.5, avg=99.4,
-                                              limit=exit_["args"]["limit_price"], status="filled",
+                                              limit=float(exit_["args"]["limit_price"]), status="filled",
                                               updated="2026-10-02T00:08:00Z")
     ctx, line = step(root, b, frames(), exit_["id"], NOW + timedelta(seconds=20))
     assert line == "NEXT" and "SOL" not in ctx.st["positions"]
@@ -171,3 +171,39 @@ def test_unknown_status_three_times_stops(root):
     _, buy = buy_plan(root, b, fr)
     lines = [step(root, b, fr, buy["id"], NOW + timedelta(seconds=i))[1] for i in range(3)]
     assert lines == ["WAIT 10", "WAIT 10", "STOP"]
+
+
+def test_last_exit_attempt_unfilled_puts_the_stop_back_before_stopping(root):
+    b, protect = protect_setup(root)
+    b.placed[protect["args"]["ref_id"]] = order("p1", coin="SOL", qty=0.5, stop=92.0, status="rejected")
+    step(root, b, frames(), protect["id"], NOW)
+    exit_ = new_action(step(root, b, frames(), protect["id"], NOW)[1])
+    plan_path = Paths(root).plans / "latest.json"
+    plan = json.loads(plan_path.read_text())
+    for a in plan["actions"]:
+        if a["id"] == exit_["id"]:
+            a["attempt"] = 4                                    # this was the last attempt (3 reprices + 1)
+    plan_path.write_text(json.dumps(plan))
+    b.placed[exit_["args"]["ref_id"]] = order("e9", coin="SOL", type_="limit", qty=0.5, limit=90.0, status="open")
+    later = NOW + timedelta(seconds=200)
+    cancel = new_action(step(root, b, frames(), exit_["id"], later)[1])
+    assert cancel["kind"] == "CANCEL" and cancel["args"]["order_id"] == "e9"
+    b.statuses["e9"] = order("e9", coin="SOL", type_="limit", qty=0.5, limit=90.0, status="canceled")
+    back = new_action(step(root, b, frames(), cancel["id"], later)[1])
+    assert back["kind"] == "PROTECT" and float(back["args"]["stop_price"]) == 92.0
+    assert float(back["args"]["quantity"]) == 0.5
+    b.placed[back["args"]["ref_id"]] = order("p9", coin="SOL", qty=0.5, stop=92.0, status="open")
+    ctx, line = step(root, b, frames(), back["id"], later)
+    assert line == "STOP" and ctx.st["positions"]["SOL"]["stop_order_id"] == "p9"
+
+
+def test_put_back_stop_rejected_twice_pauses_instead_of_looping(root):
+    b, protect = protect_setup(root)
+    plan_path = Paths(root).plans / "latest.json"
+    plan = json.loads(plan_path.read_text())
+    plan["actions"][0]["stop_run"] = True
+    plan_path.write_text(json.dumps(plan))
+    b.placed[protect["args"]["ref_id"]] = order("p1", coin="SOL", qty=0.5, stop=92.0, status="rejected")
+    assert step(root, b, frames(), protect["id"], NOW)[1] == "RETRY"
+    ctx, line = step(root, b, frames(), protect["id"], NOW)
+    assert line == "STOP" and ctx.st["state"] == "PAUSED" and "has no stop" in ctx.st["reason"]
