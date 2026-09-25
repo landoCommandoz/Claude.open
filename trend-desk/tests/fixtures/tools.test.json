@@ -1,0 +1,122 @@
+{
+  "server": "robinhood-trading",
+  "note": "TEST FIXTURE ONLY. Built from setup/tools.template.json with made-up increments. The real config/tools.json is built in Phase 1 from live tool schemas.",
+  "tools": {
+    "mcp__robinhood-trading__get_accounts": {
+      "class": "read",
+      "role": "accounts",
+      "args_map": {}
+    },
+    "mcp__robinhood-trading__get_portfolio": {
+      "class": "read",
+      "role": "account_value",
+      "args_map": {
+        "account": "account_number"
+      }
+    },
+    "mcp__robinhood-trading__get_crypto_positions": {
+      "class": "read",
+      "role": "positions",
+      "args_map": {
+        "account": "rhs_account_number"
+      }
+    },
+    "mcp__robinhood-trading__get_crypto_orders": {
+      "class": "read",
+      "role": "orders",
+      "args_map": {
+        "account": "rhs_account_number"
+      }
+    },
+    "mcp__robinhood-trading__get_crypto_quotes": {
+      "class": "read",
+      "role": "quotes",
+      "args_map": {
+        "symbols": "symbols",
+        "account": "rhs_account_number"
+      }
+    },
+    "mcp__robinhood-trading__get_currency_pairs": {
+      "class": "read",
+      "role": "pairs",
+      "args_map": {
+        "limit": "limit",
+        "cursor": "cursor"
+      }
+    },
+    "mcp__robinhood-trading__preview_crypto_order": {
+      "class": "preview",
+      "role": "crypto_order_preview",
+      "args_map": {
+        "account": "rhs_account_number",
+        "coin": "symbol",
+        "side": "side",
+        "order_type": "type",
+        "qty": "quantity",
+        "limit_price": "limit_price",
+        "stop_price": "stop_price",
+        "time_in_force": "time_in_force"
+      }
+    },
+    "mcp__robinhood-trading__place_crypto_order": {
+      "class": "place",
+      "role": "crypto_order",
+      "args_map": {
+        "account": "rhs_account_number",
+        "coin": "symbol",
+        "side": "side",
+        "order_type": "type",
+        "qty": "quantity",
+        "limit_price": "limit_price",
+        "stop_price": "stop_price",
+        "time_in_force": "time_in_force",
+        "ref_id": "ref_id"
+      }
+    },
+    "mcp__robinhood-trading__cancel_crypto_order": {
+      "class": "cancel",
+      "role": "cancel_order",
+      "args_map": {
+        "order_id": "order_id",
+        "account": "rhs_account_number"
+      }
+    },
+    "mcp__robinhood-trading__transfer_funds": {
+      "class": "forbidden",
+      "role": "none",
+      "args_map": {}
+    }
+  },
+  "order_type_values": {
+    "limit": "limit",
+    "stop_market": "stop_loss",
+    "stop_limit": "stop_limit",
+    "market": "market"
+  },
+  "stop_order_type": "stop_market",
+  "stop_time_in_force": "gtc",
+  "increments": {
+    "BTC": {
+      "qty": 1e-08,
+      "price": 0.01
+    },
+    "ETH": {
+      "qty": 1e-08,
+      "price": 0.01
+    },
+    "SOL": {
+      "qty": 1e-06,
+      "price": 0.01
+    },
+    "DOGE": {
+      "qty": 0.1,
+      "price": 1e-05
+    }
+  },
+  "min_order_usd": {
+    "BTC": 1.0,
+    "ETH": 1.0,
+    "SOL": 1.0,
+    "DOGE": 1.0
+  }
+}
